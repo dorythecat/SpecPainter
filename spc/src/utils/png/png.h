@@ -3,5 +3,6 @@
 #pragma once
 
 #include <stdio.h>
+#include <stdlib.h>
 
 void decode_png();
