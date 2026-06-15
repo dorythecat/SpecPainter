@@ -1,4 +1,4 @@
-// PNG Decoder, as per RFC 2083
+// PNG Decoder, as per https://www.w3.org/TR/png-3/
 
 #pragma once
 
