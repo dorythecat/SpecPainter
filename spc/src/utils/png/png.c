@@ -93,23 +93,18 @@ unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigne
     printf("Data size exceeds expected maximum for this chunk!\n");
     return values_size;
   }
-  printf("Chunk data length: %d\n", *data_size);
   for (unsigned int i = 0; i < 4; i++) name[i] = values[index++];
-  // These values aren't really used currently but it's nice having them, nonetheless
-  char critical = ((unsigned char)name[0] & 32) != 32;
-  char private  = ((unsigned char)name[1] & 32) == 32;
+  // These values aren't really used but it's nice having them, nonetheless
+  //char critical = ((unsigned char)name[0] & 32) != 32;
+  //char private  = ((unsigned char)name[1] & 32) == 32;
   if (((unsigned char)name[2] & 32) == 32) {
-    printf("PNG image cannot be read (it does not conform to PNGv3 standard)!\n");
+    printf("Image does not conform to PNGv3 standard!\n");
     return values_size;
   }
-  char safecopy = ((unsigned char)name[3] & 32) == 32;
-  printf("Critical chunk: %d\n", critical);
-  printf("Private chunk: %d\n", private);
-  printf("Safe to copy chunk: %d\n", safecopy);
+  //char safecopy = ((unsigned char)name[3] & 32) == 32;
 
-  for (unsigned int i = 0; i < *data_size; i++) {
-    data[i] = values[index++];
-  } index += 4; // Skip CRC
+  for (unsigned int i = 0; i < *data_size; i++) data[i] = values[index++];
+  index += 4; // TODO: Actually check CRC
 
   return index;
 }
