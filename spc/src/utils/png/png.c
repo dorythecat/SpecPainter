@@ -62,27 +62,38 @@ void decode_png() {
     return;
   }
   char *name;
-  chunk_read(values, i, 8, name);
+  unsigned char *data;
+  unsigned int size;
+  unsigned int index = 8;
+  index = chunk_read(values, i, index, name, data, &size);
+  printf("Final index: %d\n", index);
   free(values);
 }
 
-void chunk_read(unsigned char *values, unsigned int size, unsigned int chunk_index, char *name) {
-  unsigned int data_length = 0;
+unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigned int index, char *name, unsigned char *data, unsigned int *data_size) {
   for (unsigned int i = 0; i < 4; i++) {
-    data_length *= 255;
-    data_length += values[chunk_index++];
+    *data_size *= 256;
+    *data_size += values[index++];
   }
-  printf("Chunk data length: %d\n", data_length);
+  printf("Chunk data length: %d\n", *data_size);
   name = malloc(sizeof *name * 4);
-  for (unsigned int i = 0; i < 4; i++) name[i] = values[chunk_index++];
+  for (unsigned int i = 0; i < 4; i++) name[i] = values[index++];
+  // These values aren't really used currently but it's nice having them, nonetheless
   char critical = ((unsigned char)name[0] & 32) != 32;
   char private  = ((unsigned char)name[1] & 32) == 32;
   if (((unsigned char)name[2] & 32) == 32) {
     printf("PNG image cannot be read (it does not conform to PNGv3 standard)!\n");
-    return;
+    return values_size;
   }
   char safecopy = ((unsigned char)name[3] & 32) == 32;
   printf("Critical chunk: %d\n", critical);
   printf("Private chunk: %d\n", private);
   printf("Safe to copy chunk: %d\n", safecopy);
+
+  data = malloc(sizeof *data * *data_size);
+  for (unsigned int i = 0; i < *data_size; i++) {
+    data[i] = values[index++];
+  } index += 4; // Skip CRC
+
+  return index;
 }

@@ -6,4 +6,4 @@
 #include <stdlib.h>
 
 void decode_png();
-void chunk_read(unsigned char *values, unsigned int size, unsigned int chunk_index, char *name);
+unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigned int index, char *name, unsigned char *data, unsigned int *data_size);
