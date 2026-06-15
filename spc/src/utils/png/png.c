@@ -47,15 +47,19 @@ void decode_png() {
   } i -= 3;
   free(temp);
 
-  printf("%d\n", i);
-  printf("%d\n", values[0]);
-  printf("%d\n", values[1]);
-  printf("%d\n", values[2]);
-  printf("%d\n", values[3]);
-  printf("%d\n", values[4]);
-  printf("%d\n", values[5]);
-  printf("%d\n", values[6]);
-  printf("%d\n", values[7]);
-  printf("%d\n", values[i]);
+  printf("Image size: %d\n", i);
+  if (
+      values[0] != 137 ||
+      values[1] != 80  ||
+      values[2] != 78  ||
+      values[3] != 71  ||
+      values[4] != 13  ||
+      values[5] != 10  ||
+      values[6] != 26  ||
+      values[7] != 10
+  ) {
+    printf("Invalid file signature!\n");
+    return;
+  }
   free(values);
 }
