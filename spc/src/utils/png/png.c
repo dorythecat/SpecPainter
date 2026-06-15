@@ -2,7 +2,7 @@
 
 void decode_png() {
   FILE *fp = fopen("logo.png", "r");
-  if (fp == NULL) { // File could not be loaded
+  if (fp == NULL || ferror(fp)) { // File could not be loaded
     printf("Error encountered when opening file!\n");
     return;
   }
