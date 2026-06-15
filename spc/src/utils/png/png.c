@@ -6,7 +6,7 @@ void decode_png() {
     printf("Error encountered when opening file!\n");
     return;
   }
-  unsigned int i;
+  unsigned int i = 1;
   unsigned int limit = 65536; // 2^16
   unsigned int *values = malloc(sizeof *values * limit);
   while (1) {
@@ -34,19 +34,28 @@ void decode_png() {
   // Resize our array to be EXACTLY as much space as we need
   // To be a bit more efficient we can just use temp going forwards tbh
   unsigned int counter = i;
-  unsigned int *temp = malloc(sizeof *temp * i);
+  unsigned int *temp = malloc(sizeof *temp * (i - 1));
   while (counter != 0) {
     temp[counter] = values[counter];
     counter--;
-  }
+  } counter++;
   free(values);
-  values = malloc(sizeof *temp * i);
-  while (counter < limit / 2) {
-    values[counter] = temp[counter];
+  values = malloc(sizeof *temp * (i - 2));
+  while (counter < i - 1) {
+    values[counter - 1] = temp[counter];
     counter++;
-  }
+  } i -= 3;
   free(temp);
 
   printf("%d\n", i);
+  printf("%d\n", values[0]);
+  printf("%d\n", values[1]);
+  printf("%d\n", values[2]);
+  printf("%d\n", values[3]);
+  printf("%d\n", values[4]);
+  printf("%d\n", values[5]);
+  printf("%d\n", values[6]);
+  printf("%d\n", values[7]);
+  printf("%d\n", values[i]);
   free(values);
 }
