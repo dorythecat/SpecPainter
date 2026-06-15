@@ -61,22 +61,39 @@ void decode_png() {
     printf("Invalid file signature!\n");
     return;
   }
-  char *name;
-  unsigned char *data;
+  char *name = malloc(sizeof *name * 4);
+  unsigned char *data = malloc(sizeof *data * 13);
   unsigned int size;
   unsigned int index = 8;
-  index = chunk_read(values, i, index, name, data, &size);
+  index = chunk_read(values, i, index, name, data, 13, &size);
+  if (index >= i) {
+    printf("Error encountered when reading chunk!\n");
+    return;
+  }
   printf("Final index: %d\n", index);
+  if (
+      name[0] != 73 ||
+      name[1] != 72 ||
+      name[2] != 68 ||
+      name[3] != 82
+  ) {
+    printf("Invalid first chunk!\n");
+    return;
+  }
+
   free(values);
 }
 
-unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigned int index, char *name, unsigned char *data, unsigned int *data_size) {
+unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
   for (unsigned int i = 0; i < 4; i++) {
     *data_size *= 256;
     *data_size += values[index++];
   }
+  if (*data_size > max_size) {
+    printf("Data size exceeds expected maximum for this chunk!\n");
+    return values_size;
+  }
   printf("Chunk data length: %d\n", *data_size);
-  name = malloc(sizeof *name * 4);
   for (unsigned int i = 0; i < 4; i++) name[i] = values[index++];
   // These values aren't really used currently but it's nice having them, nonetheless
   char critical = ((unsigned char)name[0] & 32) != 32;
@@ -90,7 +107,6 @@ unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigne
   printf("Private chunk: %d\n", private);
   printf("Safe to copy chunk: %d\n", safecopy);
 
-  data = malloc(sizeof *data * *data_size);
   for (unsigned int i = 0; i < *data_size; i++) {
     data[i] = values[index++];
   } index += 4; // Skip CRC
