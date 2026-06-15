@@ -8,7 +8,7 @@ void decode_png() {
   }
   unsigned int i = 1;
   unsigned int limit = 65536; // 2^16
-  unsigned int *values = malloc(sizeof *values * limit);
+  unsigned char *values = malloc(sizeof *values * limit);
   while (1) {
     if (feof(fp)) break;
     char c = fgetc(fp);
@@ -16,7 +16,7 @@ void decode_png() {
     if (i == limit) { // If we don't have enough space, resize the array to fit all of our data
       unsigned int counter = limit;
       limit *= 2;
-      unsigned int *temp = malloc(sizeof *temp * limit);
+      unsigned char *temp = malloc(sizeof *temp * limit);
       while (counter != 0) {
         temp[counter] = values[counter];
         counter--;
@@ -34,7 +34,7 @@ void decode_png() {
   // Resize our array to be EXACTLY as much space as we need
   // To be a bit more efficient we can just use temp going forwards tbh
   unsigned int counter = i;
-  unsigned int *temp = malloc(sizeof *temp * (i - 1));
+  unsigned char *temp = malloc(sizeof *temp * (i - 1));
   while (counter != 0) {
     temp[counter] = values[counter];
     counter--;
@@ -66,7 +66,7 @@ void decode_png() {
   free(values);
 }
 
-void chunk_read(unsigned int *values, unsigned int size, unsigned int chunk_index, char *name) {
+void chunk_read(unsigned char *values, unsigned int size, unsigned int chunk_index, char *name) {
   unsigned int data_length = 0;
   for (unsigned int i = 0; i < 4; i++) {
     data_length *= 255;
