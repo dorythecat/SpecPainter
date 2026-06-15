@@ -61,5 +61,28 @@ void decode_png() {
     printf("Invalid file signature!\n");
     return;
   }
+  char *name;
+  chunk_read(values, i, 8, name);
   free(values);
+}
+
+void chunk_read(unsigned int *values, unsigned int size, unsigned int chunk_index, char *name) {
+  unsigned int data_length = 0;
+  for (unsigned int i = 0; i < 4; i++) {
+    data_length *= 255;
+    data_length += values[chunk_index++];
+  }
+  printf("Chunk data length: %d\n", data_length);
+  name = malloc(sizeof *name * 4);
+  for (unsigned int i = 0; i < 4; i++) name[i] = values[chunk_index++];
+  char critical = ((unsigned char)name[0] & 32) != 32;
+  char private  = ((unsigned char)name[1] & 32) == 32;
+  if (((unsigned char)name[2] & 32) == 32) {
+    printf("PNG image cannot be read (it does not conform to PNGv3 standard)!\n");
+    return;
+  }
+  char safecopy = ((unsigned char)name[3] & 32) == 32;
+  printf("Critical chunk: %d\n", critical);
+  printf("Private chunk: %d\n", private);
+  printf("Safe to copy chunk: %d\n", safecopy);
 }
