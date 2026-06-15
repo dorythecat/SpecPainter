@@ -1,6 +1,6 @@
-#include <stdio.h>
+#include "png.h"
 
 int main() {
-  printf("Hello world!\n");
+  decode_png();
   return 0;
 }
