@@ -85,10 +85,8 @@ void decode_png() {
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
-  for (unsigned int i = 0; i < 4; i++) {
-    *data_size *= 256;
-    *data_size += values[index++];
-  }
+  *data_size = ((values[index] * 256 + values[index + 1]) * 256 + values[index + 2]) * 256 + values[index + 3];
+  index += 4;
   if (*data_size > max_size) {
     printf("Data size exceeds expected maximum for this chunk!\n");
     return values_size;
