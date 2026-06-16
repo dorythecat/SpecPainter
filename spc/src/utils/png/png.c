@@ -29,18 +29,18 @@ void decode_png() {
       } values = temp;
     } i++;
   } fclose(fp);
-  i -= 2;
+  unsigned int values_size = i - 2;
 
   // Resize our array to be EXACTLY as much space as we need
   // To be a bit more efficient we can just use temp going forwards tbh
-  unsigned char *temp = realloc(values, sizeof *values * i);
+  unsigned char *temp = realloc(values, sizeof *values * values_size);
   if (temp == NULL) {
     printf("Error encountered when shrinking memory for image data!\n");
     free(values);
     return;
   } values = temp;
 
-  printf("Image size: %d\n", i);
+  printf("File size: %d\n", values_size);
   if (values[0] != 137 ||
       values[1] != 80  ||
       values[2] != 78  ||
@@ -64,17 +64,13 @@ void decode_png() {
   unsigned char *data = malloc(sizeof *data * 13);
   if (data == NULL) {
     printf("Error encountered when allocating memory for chunk data!\n");
-    free(values);
     free(name);
+    free(values);
     return;
   }
   unsigned int size = 0;
-  unsigned int index = chunk_read(values, i, 8, name, data, 13, &size);
-  if (name[0] != 73 ||
-      name[1] != 72 ||
-      name[2] != 68 ||
-      name[3] != 82 ||
-      size != 13) {
+  unsigned int index = chunk_read(values, 8, name, data, 13, &size);
+  if (name[0] != 73 || name[1] != 72 || name[2] != 68 || name[3] != 82 || size != 13) {
     printf("Invalid first chunk!\n");
     free(name);
     free(data);
@@ -139,35 +135,57 @@ void decode_png() {
     unsigned char *data = malloc(sizeof *data * 2147483647); // Support up to the maximum size possible
     if (data == NULL) {
       printf("Error encountered when allocating memory for chunk data!\n");
-      free(values);
       free(name);
+      free(values);
       return;
     }
-    index = chunk_read(values, i, index, name, data, 2147483647, &size);
-    printf("Chunk name: %s\n", name);
+    index = chunk_read(values, index, name, data, 2147483647, &size);
+    printf("Chunk name and size: (%s, %d)\n", name, size);
+
+    if (name[0] == 80 && name[1] == 76 && name[2] == 84 && name[3] == 69) { // PLTE
+      if (size % 3 != 0) {
+        printf("Invalid PLTE chunk size!\n");
+        free(name);
+        free(data);
+        free(values);
+        return;
+      }
+
+      palette_size = size / 3;
+      palette = malloc(sizeof *palette * size);
+      if (palette == NULL) {
+        printf("Error encountered when allocating memory for palette data!\n");
+        free(name);
+        free(data);
+        free(values);
+        return;
+      }
+      for (unsigned int i = 0; i < size; i++) palette[i] = data[i];
+    }
+
     free(name);
     free(data);
-  }
+  } free(values);
 
-  free(values);
+  if (color_type == 3 && palette == NULL) {
+    printf("Palette not found for indexed color type!\n");
+    return;
+  }
 }
 
-unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
+unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
   *data_size = ((values[index] * 256 + values[index + 1]) * 256 + values[index + 2]) * 256 + values[index + 3];
   if (*data_size > max_size) {
     printf("Data size exceeds expected maximum for this chunk!\n");
-    return values_size;
+    return -1;
   } index += 4;
   for (unsigned int i = 0; i < 4; i++) name[i] = values[index++];
-  // These values aren't really used but it's nice having them, nonetheless
-  //char critical = ((unsigned char)name[0] & 32) != 32;
-  //char private  = ((unsigned char)name[1] & 32) == 32;
   if (((unsigned char)name[2] & 32) == 32) {
     printf("Image does not conform to PNGv3 standard!\n");
-    return values_size;
+    return -1;
   }
-  //char safecopy = ((unsigned char)name[3] & 32) == 32;
 
+  if (*data_size == 0) return -1;
   for (unsigned int i = 0; i < *data_size; i++) data[i] = values[index++];
   index += 4; // TODO: Actually check CRC
 
