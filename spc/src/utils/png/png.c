@@ -55,6 +55,8 @@ void decode_png() {
     free(values);
     return;
   }
+
+  // Load IHDR chunk
   char *name = malloc(sizeof *name * 4);
   if (name == NULL) {
     printf("Error encountered when allocating memory for chunk name!\n");
@@ -68,14 +70,14 @@ void decode_png() {
     free(name);
     return;
   }
-  unsigned int size;
-  unsigned int index = 8;
-  index = chunk_read(values, i, index, name, data, 13, &size);
+  unsigned int size = 0;
+  unsigned int index = chunk_read(values, i, 8, name, data, 13, &size);
   if (
       name[0] != 73 ||
       name[1] != 72 ||
       name[2] != 68 ||
-      name[3] != 82
+      name[3] != 82 ||
+      size != 13
   ) {
     printf("Invalid first chunk!\n");
     free(name);
@@ -130,16 +132,36 @@ void decode_png() {
   printf("Image width: %d\n", width);
   printf("Image height: %d\n", height);
 
+  // Load all of the following chunks, ignore unknown chunk formats and handle all known cases
+  while (index < i) {
+    char *name = malloc(sizeof *name * 4);
+    if (name == NULL) {
+      printf("Error encountered when allocating memory for chunk name!\n");
+      free(values);
+      return;
+    }
+    unsigned char *data = malloc(sizeof *data * 2147483647); // Support up to the maximum size possible
+    if (data == NULL) {
+      printf("Error encountered when allocating memory for chunk data!\n");
+      free(values);
+      free(name);
+      return;
+    }
+    index = chunk_read(values, i, index, name, data, 2147483647, &size);
+    printf("Chunk name: %s\n", name);
+    free(name);
+    free(data);
+  }
+
   free(values);
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int values_size, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
   *data_size = ((values[index] * 256 + values[index + 1]) * 256 + values[index + 2]) * 256 + values[index + 3];
-  index += 4;
   if (*data_size > max_size) {
     printf("Data size exceeds expected maximum for this chunk!\n");
     return values_size;
-  }
+  } index += 4;
   for (unsigned int i = 0; i < 4; i++) name[i] = values[index++];
   // These values aren't really used but it's nice having them, nonetheless
   //char critical = ((unsigned char)name[0] & 32) != 32;
