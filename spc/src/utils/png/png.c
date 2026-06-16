@@ -125,6 +125,8 @@ void decode_png() {
   printf("Image height: %d\n", height);
 
   // Load all of the following chunks, ignore unknown chunk formats and handle all known cases
+  unsigned char *palette = NULL; // In case we need to have a palette
+  unsigned int palette_size = 0; // Size of the palette, in number of entries
   while (index < i) {
     char *name = malloc(sizeof *name * 4);
     if (name == NULL) {
@@ -132,7 +134,7 @@ void decode_png() {
       free(values);
       return;
     }
-    unsigned char *data = malloc(sizeof *data * 2147483647); // Support up to the maximum size possible
+    unsigned char *data = malloc(sizeof *data * 2147483647); // Support up to the maximum size possible, could probably find more efficient alternative, most likely involving removing some abstraction...
     if (data == NULL) {
       printf("Error encountered when allocating memory for chunk data!\n");
       free(name);
@@ -159,8 +161,7 @@ void decode_png() {
         free(data);
         free(values);
         return;
-      }
-      for (unsigned int i = 0; i < size; i++) palette[i] = data[i];
+      } for (unsigned int i = 0; i < size; i++) palette[i] = data[i];
     }
 
     free(name);
