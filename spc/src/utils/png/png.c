@@ -124,86 +124,81 @@ void decode_png() {
   printf("Image width: %d\n", width);
   printf("Image height: %d\n", height);
 
+  name = malloc(sizeof *name * 4);
+  if (name == NULL) {
+    printf("Error encountered when allocating memory for chunk name!\n");
+    free(values);
+    return;
+  }
+
+  data = malloc(sizeof *data * 2147483647);
+  if (data == NULL) {
+    printf("Error encountered when allocating memory for chunk data!\n");
+    free(name);
+    free(values);
+    return;
+  }
+
   // Load all of the following chunks, ignore unknown chunk formats and handle all known cases
   unsigned char *palette = NULL; // In case we need to have a palette
   unsigned int palette_size = 0; // Size of the palette, in number of entries
   unsigned char *transparency = NULL;
-  while (index < i) {
-    char *name = malloc(sizeof *name * 4);
-    if (name == NULL) {
-      printf("Error encountered when allocating memory for chunk name!\n");
-      free(values);
-      return;
-    }
-    unsigned char *data = malloc(sizeof *data * 2147483647); // Support up to the maximum size possible, could probably find more efficient alternative, most likely involving removing some abstraction...
-    if (data == NULL) {
-      printf("Error encountered when allocating memory for chunk data!\n");
-      free(name);
-      free(values);
-      return;
-    }
-    index = chunk_read(values, index, name, data, 2147483647, &size);
+  while (1) {
+    index = chunk_read(values, index, name, data, 2147483647, &size); 
     printf("Chunk name and size: (%s, %d)\n", name, size);
+    if (index == (unsigned int)-1) break;
 
     if (name[0] == 80 && name[1] == 76 && name[2] == 84 && name[3] == 69) { // PLTE
       if (size % 3 != 0) {
         printf("Invalid PLTE chunk size!\n");
-        free(name);
-        free(data);
-        free(values);
-        return;
+        break;
       }
 
       palette_size = size / 3;
       palette = malloc(sizeof *palette * size);
       if (palette == NULL) {
         printf("Error encountered when allocating memory for palette data!\n");
-        free(name);
-        free(data);
-        free(values);
-        return;
+        break;
       } for (unsigned int i = 0; i < size; i++) palette[i] = data[i];
     } else if (name[0] == 116 && name[1] == 82 && name[2] == 78 && name[3] == 83) { // tRNS
       if (color_type == 4 || color_type == 6) {
         printf("Transparency chunk present on image with transparency data!\n");
-        free(name);
-        free(data);
-        free(values);
-        return;
+        break;
       }
 
       if (color_type == 0 || color_type == 2) {
         transparency = malloc(sizeof *transparency * (size / 2));
         if (transparency == NULL) {
           printf("Error encountered when allocating memory for transparency data!\n");
-          free(name);
-          free(data);
-          free(values);
-          return;
+          break;
         } for (unsigned int i = 0; i < size; i += 2) transparency[i] = data[i] * 256 + data[i + 1];
       } else {
         transparency = malloc(sizeof *transparency * size);
         if (transparency == NULL) {
           printf("Error encountered when allocating memory for transparency data!\n");
-          free(name);
-          free(data);
-          free(values);
-          return;
+          break;
         } for (unsigned int i = 0; i < size; i++) transparency[i] = data[i];
       }
     }
+  }
+  free(data);
+  free(name);
+  free(values);
 
-    free(name);
-    free(data);
-  } free(values);
+  if (index != (unsigned int)-1) { // Error ocurred
+    printf("Fatal error found while loading chunk, aborting...\n");
+    free(palette);
+    free(transparency);
+    return;
+  }
 
   if (color_type == 3 && palette == NULL) {
     printf("Palette not found for indexed color type!\n");
     return;
   }
 
-  if (palette != NULL) free(palette);
-  if (transparency != NULL) free(transparency);
+  free(palette);
+  free(transparency);
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
