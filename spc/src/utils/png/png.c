@@ -7,46 +7,38 @@ void decode_png() {
     fclose(fp);
     return;
   }
-  unsigned int i = 1;
+  unsigned int i = 0;
   unsigned int limit = 65536; // 2^16
   unsigned char *values = malloc(sizeof *values * limit);
+  if (values == NULL) {
+    printf("Error encountered when allocating memory for image data!\n");
+    fclose(fp);
+    return;
+  }
   while (1) {
     if (feof(fp)) break;
-    char c = fgetc(fp);
-    values[i] = (unsigned char)c;
+    values[i] = (unsigned char)fgetc(fp);
     if (i == limit) { // If we don't have enough space, resize the array to fit all of our data
-      unsigned int counter = limit;
       limit *= 2;
-      unsigned char *temp = malloc(sizeof *temp * limit);
-      while (counter != 0) {
-        temp[counter] = values[counter];
-        counter--;
-      }
-      free(values);
-      values = malloc(sizeof *values * limit);
-      while (counter < limit / 2) {
-        values[counter] = temp[counter];
-        counter++;
-      }
-      free(temp);
+      unsigned char *temp = realloc(values, sizeof *values * limit);
+      if (temp == NULL) {
+        printf("Error encountered when growing memory for image data!\n");
+        free(values);
+        fclose(fp);
+        return;
+      } values = temp;
     } i++;
   } fclose(fp);
+  i -= 2;
 
   // Resize our array to be EXACTLY as much space as we need
   // To be a bit more efficient we can just use temp going forwards tbh
-  unsigned int counter = i;
-  unsigned char *temp = malloc(sizeof *temp * (i - 1));
-  while (counter != 0) {
-    temp[counter] = values[counter];
-    counter--;
-  } counter++;
-  free(values);
-  values = malloc(sizeof *temp * (i - 2));
-  while (counter < i - 1) {
-    values[counter - 1] = temp[counter];
-    counter++;
-  } i -= 3;
-  free(temp);
+  unsigned char *temp = realloc(values, sizeof *values * i);
+  if (temp == NULL) {
+    printf("Error encountered when shrinking memory for image data!\n");
+    free(values);
+    return;
+  } values = temp;
 
   printf("Image size: %d\n", i);
   if (
@@ -64,15 +56,21 @@ void decode_png() {
     return;
   }
   char *name = malloc(sizeof *name * 4);
+  if (name == NULL) {
+    printf("Error encountered when allocating memory for chunk name!\n");
+    free(values);
+    return;
+  }
   unsigned char *data = malloc(sizeof *data * 13);
+  if (data == NULL) {
+    printf("Error encountered when allocating memory for chunk data!\n");
+    free(values);
+    free(name);
+    return;
+  }
   unsigned int size;
   unsigned int index = 8;
   index = chunk_read(values, i, index, name, data, 13, &size);
-  if (index >= i) {
-    printf("Error encountered when reading chunk!\n");
-    return;
-  }
-  printf("Final index: %d\n", index);
   if (
       name[0] != 73 ||
       name[1] != 72 ||
@@ -128,6 +126,9 @@ void decode_png() {
     free(values);
     return;
   }
+
+  printf("Image width: %d\n", width);
+  printf("Image height: %d\n", height);
 
   free(values);
 }
