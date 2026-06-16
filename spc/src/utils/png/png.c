@@ -143,6 +143,8 @@ void decode_png() {
   unsigned char *palette = NULL; // In case we need to have a palette
   unsigned int palette_size = 0; // Size of the palette, in number of entries
   unsigned char *transparency = NULL;
+  unsigned char *idat = NULL;
+  unsigned int idat_size = 0;
   while (1) {
     index = chunk_read(values, index, name, data, 2147483647, &size); 
     printf("Chunk name and size: (%s, %d)\n", name, size);
@@ -179,6 +181,14 @@ void decode_png() {
           break;
         } for (unsigned int i = 0; i < size; i++) transparency[i] = data[i];
       }
+    } else if (name[0] == 73 && name[1] == 68 && name[2] == 65 && name[3] == 84) { // IDAT
+      idat_size += size;
+      unsigned char *temp = realloc(idat, sizeof *idat * idat_size);
+      if (temp == NULL) {
+        printf("Error encountered when growing memory for image data!\n");
+        break;
+      } idat = temp;
+      for (unsigned int i = 0; i < size; i++) idat[idat_size - size + i] = data[i];
     }
   }
   free(data);
@@ -189,6 +199,7 @@ void decode_png() {
     printf("Fatal error found while loading chunk, aborting...\n");
     free(palette);
     free(transparency);
+    free(idat);
     return;
   }
 
@@ -199,6 +210,7 @@ void decode_png() {
 
   free(palette);
   free(transparency);
+  free(idat);
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
