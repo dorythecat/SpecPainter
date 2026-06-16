@@ -127,6 +127,7 @@ void decode_png() {
   // Load all of the following chunks, ignore unknown chunk formats and handle all known cases
   unsigned char *palette = NULL; // In case we need to have a palette
   unsigned int palette_size = 0; // Size of the palette, in number of entries
+  unsigned char *transparency = NULL;
   while (index < i) {
     char *name = malloc(sizeof *name * 4);
     if (name == NULL) {
@@ -162,6 +163,34 @@ void decode_png() {
         free(values);
         return;
       } for (unsigned int i = 0; i < size; i++) palette[i] = data[i];
+    } else if (name[0] == 116 && name[1] == 82 && name[2] == 78 && name[3] == 83) { // tRNS
+      if (color_type == 4 || color_type == 6) {
+        printf("Transparency chunk present on image with transparency data!\n");
+        free(name);
+        free(data);
+        free(values);
+        return;
+      }
+
+      if (color_type == 0 || color_type == 2) {
+        transparency = malloc(sizeof *transparency * (size / 2));
+        if (transparency == NULL) {
+          printf("Error encountered when allocating memory for transparency data!\n");
+          free(name);
+          free(data);
+          free(values);
+          return;
+        } for (unsigned int i = 0; i < size; i += 2) transparency[i] = data[i] * 256 + data[i + 1];
+      } else {
+        transparency = malloc(sizeof *transparency * size);
+        if (transparency == NULL) {
+          printf("Error encountered when allocating memory for transparency data!\n");
+          free(name);
+          free(data);
+          free(values);
+          return;
+        } for (unsigned int i = 0; i < size; i++) transparency[i] = data[i];
+      }
     }
 
     free(name);
@@ -172,6 +201,9 @@ void decode_png() {
     printf("Palette not found for indexed color type!\n");
     return;
   }
+
+  if (palette != NULL) free(palette);
+  if (transparency != NULL) free(transparency);
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
