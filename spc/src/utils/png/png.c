@@ -41,16 +41,14 @@ void decode_png() {
   } values = temp;
 
   printf("Image size: %d\n", i);
-  if (
-      values[0] != 137 ||
+  if (values[0] != 137 ||
       values[1] != 80  ||
       values[2] != 78  ||
       values[3] != 71  ||
       values[4] != 13  ||
       values[5] != 10  ||
       values[6] != 26  ||
-      values[7] != 10
-  ) {
+      values[7] != 10) {
     printf("Invalid file signature!\n");
     free(values);
     return;
@@ -72,13 +70,11 @@ void decode_png() {
   }
   unsigned int size = 0;
   unsigned int index = chunk_read(values, i, 8, name, data, 13, &size);
-  if (
-      name[0] != 73 ||
+  if (name[0] != 73 ||
       name[1] != 72 ||
       name[2] != 68 ||
       name[3] != 82 ||
-      size != 13
-  ) {
+      size != 13) {
     printf("Invalid first chunk!\n");
     free(name);
     free(data);
