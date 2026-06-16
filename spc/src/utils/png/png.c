@@ -4,6 +4,7 @@ void decode_png() {
   FILE *fp = fopen("logo.png", "r");
   if (fp == NULL || ferror(fp)) { // File could not be loaded
     printf("Error encountered when opening file!\n");
+    fclose(fp);
     return;
   }
   unsigned int i = 1;
@@ -59,6 +60,7 @@ void decode_png() {
       values[7] != 10
   ) {
     printf("Invalid file signature!\n");
+    free(values);
     return;
   }
   char *name = malloc(sizeof *name * 4);
@@ -78,6 +80,52 @@ void decode_png() {
       name[3] != 82
   ) {
     printf("Invalid first chunk!\n");
+    free(name);
+    free(data);
+    free(values);
+    return;
+  } free(name);
+
+  unsigned int width = ((data[0] * 256 + data[1]) * 256 + data[2]) * 256 + data[3];
+  unsigned int height = ((data[4] * 256 + data[5]) * 256 + data[6]) * 256 + data[7];
+  char bit_depth = data[8];
+  char color_type = data[9];
+  char compression = data[10];
+  char filter = data[11];
+  char interlace = data[12];
+  free(data);
+
+  if (color_type != 0 && color_type != 2 && color_type != 3 && color_type != 4 && color_type != 6) {
+    printf("Image color type is unsupported!\n");
+    free(values);
+    return;
+  }
+
+  if (
+      (color_type == 0 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8 && bit_depth != 16) ||
+      ((color_type == 2 || color_type == 4 || color_type == 6) && bit_depth != 8 && bit_depth != 16) ||
+      (color_type == 3 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8)
+  ) {
+    printf("Image bit depth is unsupported!\n");
+    free(values);
+    return;
+  }
+
+  if (compression != 0) {
+    printf("Image compression method is unsupported!\n");
+    free(values);
+    return;
+  }
+
+  if (filter != 0) {
+    printf("Image filter method is unsupported!\n");
+    free(values);
+    return;
+  }
+
+  if (interlace != 0 && interlace != 1) {
+    printf("Image interlace method is unsupported!\n");
+    free(values);
     return;
   }
 
