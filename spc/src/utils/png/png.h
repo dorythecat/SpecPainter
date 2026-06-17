@@ -6,5 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../lib/miniz/miniz.h"
+
 void decode_png();
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size);

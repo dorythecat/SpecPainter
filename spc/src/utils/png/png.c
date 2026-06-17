@@ -1,5 +1,22 @@
 #include "png.h"
 
+#define BUF_SIZE (1024 * 1024)
+static unsigned char s_inbuf[BUF_SIZE];
+static unsigned char s_outbuf[BUF_SIZE];
+
+typedef struct {
+    unsigned char *ptr;
+    size_t written;
+} DecompContext;
+
+static int tinfl_put_buf_func(const void *pBuf, int len, void *pUser) {
+  DecompContext *pCtx = (DecompContext *)pUser;
+  memcpy(pCtx->ptr, pBuf, len);
+  pCtx->ptr += len;
+  pCtx->written +=len;
+  return 1;
+}
+
 void decode_png() {
   FILE *fp = fopen("logo.png", "r");
   if (fp == NULL || ferror(fp)) { // File could not be loaded
@@ -142,7 +159,7 @@ void decode_png() {
   unsigned int palette_size = 0; // Size of the palette, in number of entries
   unsigned char *transparency = NULL;
   unsigned char *idat = NULL;
-  unsigned int idat_size = 0;
+  size_t idat_size = 0;
   while (1) {
     index = chunk_read(values, index, name, data, 2147483647, &size); 
     printf("Chunk name and size: (%s, %d)\n", name, size);
@@ -215,9 +232,35 @@ void decode_png() {
     return;
   }
 
+  printf("Using miniz.c version: %s\n", MZ_VERSION);
+
+  unsigned char *idat_decomp = malloc(sizeof *idat_decomp * idat_size * 1032); // Roughly the maximum theoretical compression factor
+  if (idat_decomp == NULL) {
+    printf("Error encountered when allocating memory for decompressed image data!\n");
+    free(palette);
+    free(transparency);
+    free(idat);
+    return;
+  }
+
+  DecompContext ctx;
+  ctx.ptr = idat_decomp;
+  ctx.written = 0;
+  int status = tinfl_decompress_mem_to_callback(idat, &idat_size, tinfl_put_buf_func, &ctx, TINFL_FLAG_PARSE_ZLIB_HEADER);
+  if (!status) {
+    printf("tinfl_decompress_mem_to_callback() failed with status %i!\n", status);
+    free(palette);
+    free(transparency);
+    free(idat);
+    free(idat_decomp);
+    return;
+  } free(idat);
+
+  printf("Decompressed %d bytes successfully!\n", ctx.written);
+
   free(palette);
   free(transparency);
-  free(idat);
+  free(idat_decomp);
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
