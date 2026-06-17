@@ -15,9 +15,7 @@ void decode_png() {
     fclose(fp);
     return;
   }
-  while (1) {
-    if (feof(fp)) break;
-    values[i] = (unsigned char)fgetc(fp);
+  while (!feof(fp)) {
     if (i == limit) { // If we don't have enough space, resize the array to fit all of our data
       limit *= 2;
       unsigned char *temp = realloc(values, sizeof *values * limit);
@@ -27,7 +25,7 @@ void decode_png() {
         fclose(fp);
         return;
       } values = temp;
-    } i++;
+    } values[i++] = (unsigned char)fgetc(fp);
   } fclose(fp);
   unsigned int values_size = i - 2;
 
@@ -151,7 +149,7 @@ void decode_png() {
     if (index == (unsigned int)-1) break;
 
     if (name[0] == 80 && name[1] == 76 && name[2] == 84 && name[3] == 69) { // PLTE
-      if (size % 3 != 0) {
+      if (size % 3) {
         printf("Invalid PLTE chunk size!\n");
         break;
       }
@@ -205,6 +203,15 @@ void decode_png() {
 
   if (color_type == 3 && palette == NULL) {
     printf("Palette not found for indexed color type!\n");
+    return;
+  }
+
+  // Decompress IDAT chunks
+  if ((idat[0] & 0x0F) != 8 || ((idat[0] << 8) | idat[1]) % 31 || idat[1] & 0x20) {
+    printf("Error with ZLIB header of IDAT data!\n");
+    free(palette);
+    free(transparency);
+    free(idat);
     return;
   }
 
