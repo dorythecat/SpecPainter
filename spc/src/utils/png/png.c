@@ -146,7 +146,7 @@ void decode_png() {
     return;
   }
 
-  data = malloc(sizeof *data * 2147483647);
+  data = malloc(sizeof *data * 8192);
   if (data == NULL) {
     printf("Error encountered when allocating memory for chunk data!\n");
     free(name);
@@ -161,7 +161,7 @@ void decode_png() {
   unsigned char *idat = NULL;
   size_t idat_size = 0;
   while (1) {
-    index = chunk_read(values, index, name, data, 2147483647, &size); 
+    index = chunk_read(values, index, name, data, 8192, &size); 
     printf("Chunk name and size: (%s, %d)\n", name, size);
     if (index == (unsigned int)-1) break;
 
