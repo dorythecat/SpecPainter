@@ -268,18 +268,16 @@ void decode_png() {
       return;
     }
 
-    for (unsigned int i = 0; i < ctx.written; i += 3) {
-      unsigned char palette_index = 3 * idat_decomp[i];
-      if (palette_index > palette_size) {
+    for (unsigned int i = 0; i < ctx.written; i++) {
+      unsigned int dindex = 3 * i;
+      unsigned char pindex = 3 * idat_decomp[i];
+      if (dindex > 3 * ctx.written | pindex > palette_size) {
         printf("Error encountered while parsing palette!\n");
         SAFE_FREE(palette);
         SAFE_FREE(transparency);
         SAFE_FREE(idat_decomp);
         return;
-      }
-      data[i] = palette[palette_index];
-      data[i + 1] = palette[palette_index + 1];
-      data[i + 2] = palette[palette_index + 2];
+      } for (unsigned int j = 0; j < 3; j++) data[dindex++] = palette[pindex++];
     }
   } else SAFE_MOVE(idat_decomp, data);
   SAFE_FREE(palette);
