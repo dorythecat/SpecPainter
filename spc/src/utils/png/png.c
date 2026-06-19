@@ -23,7 +23,6 @@ void decode_png() {
     fclose(fp);
     return;
   }
-  unsigned int i = 0;
   unsigned int limit = 65536; // 2^16
   unsigned char *values = malloc(sizeof *values * limit);
   if (values == NULL) {
@@ -31,13 +30,14 @@ void decode_png() {
     fclose(fp);
     return;
   }
-  while (!feof(fp)) {
+  unsigned int i = 0;
+  for (!feof(fp)) {
     if (i == limit) { // If we don't have enough space, resize the array to fit all of our data
       limit *= 2;
       unsigned char *temp = realloc(values, sizeof *values * limit);
       if (temp == NULL) {
         printf("Error encountered when growing memory for image data!\n");
-        free(values);
+        SAFE_FREE(values);
         fclose(fp);
         return;
       } values = temp;
@@ -52,17 +52,11 @@ void decode_png() {
     printf("Error encountered when shrinking memory for image data!\n");
     SAFE_FREE(values);
     return;
-  } values = temp;
+  } SAFE_MOVE(temp, values);
 
   printf("File size: %d\n", values_size);
-  if (values[0] != 137 ||
-      values[1] != 80  ||
-      values[2] != 78  ||
-      values[3] != 71  ||
-      values[4] != 13  ||
-      values[5] != 10  ||
-      values[6] != 26  ||
-      values[7] != 10) {
+  if (values[0] != 137 || values[1] != 80 || values[2] != 78 || values[3] != 71 ||
+      values[4] != 13  || values[5] != 10 || values[6] != 26 || values[7] != 10) {
     printf("Invalid file signature!\n");
     SAFE_FREE(values);
     return;
@@ -107,11 +101,9 @@ void decode_png() {
     return;
   }
 
-  if (
-      (color_type == 0 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8 && bit_depth != 16) ||
+  if ((color_type == 0 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8 && bit_depth != 16) ||
       ((color_type == 2 || color_type == 4 || color_type == 6) && bit_depth != 8 && bit_depth != 16) ||
-      (color_type == 3 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8)
-  ) {
+      (color_type == 3 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8)) {
     printf("Image bit depth is unsupported!\n");
     SAFE_FREE(values);
     return;
