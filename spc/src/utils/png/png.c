@@ -1,8 +1,7 @@
 #include "png.h"
 
-#define BUF_SIZE (1024 * 1024)
-static unsigned char s_inbuf[BUF_SIZE];
-static unsigned char s_outbuf[BUF_SIZE];
+#define SAFE_FREE(p) free(p); p = NULL;
+#define SAFE_MOVE(from, to) to = from; from = NULL;
 
 typedef struct {
     unsigned char *ptr;
@@ -51,7 +50,7 @@ void decode_png() {
   unsigned char *temp = realloc(values, sizeof *values * values_size);
   if (temp == NULL) {
     printf("Error encountered when shrinking memory for image data!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   } values = temp;
 
@@ -65,7 +64,7 @@ void decode_png() {
       values[6] != 26  ||
       values[7] != 10) {
     printf("Invalid file signature!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   }
 
@@ -73,25 +72,25 @@ void decode_png() {
   char *name = malloc(sizeof *name * 4);
   if (name == NULL) {
     printf("Error encountered when allocating memory for chunk name!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   }
   unsigned char *data = malloc(sizeof *data * 13);
   if (data == NULL) {
     printf("Error encountered when allocating memory for chunk data!\n");
-    free(name);
-    free(values);
+    SAFE_FREE(name);
+    SAFE_FREE(values);
     return;
   }
   unsigned int size = 0;
   unsigned int index = chunk_read(values, 8, name, data, 13, &size);
   if (name[0] != 73 || name[1] != 72 || name[2] != 68 || name[3] != 82 || size != 13) {
     printf("Invalid first chunk!\n");
-    free(name);
-    free(data);
-    free(values);
+    SAFE_FREE(name);
+    SAFE_FREE(data);
+    SAFE_FREE(values);
     return;
-  } free(name);
+  } SAFE_FREE(name);
 
   unsigned int width = ((data[0] * 256 + data[1]) * 256 + data[2]) * 256 + data[3];
   unsigned int height = ((data[4] * 256 + data[5]) * 256 + data[6]) * 256 + data[7];
@@ -100,11 +99,11 @@ void decode_png() {
   char compression = data[10];
   char filter = data[11];
   char interlace = data[12];
-  free(data);
+  SAFE_FREE(data);
 
   if (color_type != 0 && color_type != 2 && color_type != 3 && color_type != 4 && color_type != 6) {
     printf("Image color type is unsupported!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   }
 
@@ -114,25 +113,25 @@ void decode_png() {
       (color_type == 3 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8)
   ) {
     printf("Image bit depth is unsupported!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   }
 
   if (compression != 0) {
     printf("Image compression method is unsupported!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   }
 
   if (filter != 0) {
     printf("Image filter method is unsupported!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   }
 
   if (interlace != 0 && interlace != 1) {
     printf("Image interlace method is unsupported!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   }
 
@@ -142,15 +141,15 @@ void decode_png() {
   name = malloc(sizeof *name * 4);
   if (name == NULL) {
     printf("Error encountered when allocating memory for chunk name!\n");
-    free(values);
+    SAFE_FREE(values);
     return;
   }
 
   data = malloc(sizeof *data * 8192);
   if (data == NULL) {
     printf("Error encountered when allocating memory for chunk data!\n");
-    free(name);
-    free(values);
+    SAFE_FREE(name);
+    SAFE_FREE(values);
     return;
   }
 
@@ -206,15 +205,15 @@ void decode_png() {
       for (unsigned int i = 0; i < size; i++) idat[idat_size - size + i] = data[i];
     }
   }
-  free(data);
-  free(name);
-  free(values);
+  SAFE_FREE(data);
+  SAFE_FREE(name);
+  SAFE_FREE(values);
 
   if (index != (unsigned int)-1) { // Error ocurred
     printf("Fatal error found while loading chunk, aborting...\n");
-    free(palette);
-    free(transparency);
-    free(idat);
+    SAFE_FREE(palette);
+    SAFE_FREE(transparency);
+    SAFE_FREE(idat);
     return;
   }
 
@@ -226,9 +225,9 @@ void decode_png() {
   // Decompress IDAT chunks
   if ((idat[0] & 0x0F) != 8 || ((idat[0] << 8) | idat[1]) % 31 || idat[1] & 0x20) {
     printf("Error with ZLIB header of IDAT data!\n");
-    free(palette);
-    free(transparency);
-    free(idat);
+    SAFE_FREE(palette);
+    SAFE_FREE(transparency);
+    SAFE_FREE(idat);
     return;
   }
 
@@ -237,9 +236,9 @@ void decode_png() {
   unsigned char *idat_decomp = malloc(sizeof *idat_decomp * idat_size * 1032); // Roughly the maximum theoretical compression factor
   if (idat_decomp == NULL) {
     printf("Error encountered when allocating memory for decompressed image data!\n");
-    free(palette);
-    free(transparency);
-    free(idat);
+    SAFE_FREE(palette);
+    SAFE_FREE(transparency);
+    SAFE_FREE(idat);
     return;
   }
 
@@ -250,39 +249,43 @@ void decode_png() {
   free(idat);
   if (!status) {
     printf("tinfl_decompress_mem_to_callback() failed with status %i!\n", status);
-    free(palette);
-    free(transparency);
-    free(idat_decomp);
+    SAFE_FREE(palette);
+    SAFE_FREE(transparency);
+    SAFE_FREE(idat_decomp);
     return;
   }
 
   printf("Decompressed %d bytes successfully!\n", ctx.written);
 
-  unsigned char *data = NULL;
+  data = NULL; // Reusing an old name, technically a sin I guess? :/
   if (color_type == 3) {
     data = malloc(sizeof *data * ctx.written * 3);
     if (data == NULL) {
       printf("Error encountered when allocating memory for parsed image data!\n");
-      free(palette);
-      free(transparency);
-      free(idat_decomp);
+      SAFE_FREE(palette);
+      SAFE_FREE(transparency);
+      SAFE_FREE(idat_decomp);
       return;
     }
 
     for (unsigned int i = 0; i < ctx.written; i += 3) {
       unsigned char palette_index = 3 * idat_decomp[i];
+      if (palette_index > palette_size) {
+        printf("Error encountered while parsing palette!\n");
+        SAFE_FREE(palette);
+        SAFE_FREE(transparency);
+        SAFE_FREE(idat_decomp);
+        return;
+      }
       data[i] = palette[palette_index];
       data[i + 1] = palette[palette_index + 1];
       data[i + 2] = palette[palette_index + 2];
     }
-  } else {
-    data = idat_decomp;
-    idat_decomp = NULL;
-  }
-  free(palette);
-  free(idat_decomp);
+  } else SAFE_MOVE(idat_decomp, data);
+  SAFE_FREE(palette);
+  SAFE_FREE(idat_decomp);
 
-  free(transparency);
+  SAFE_FREE(transparency);
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
