@@ -247,20 +247,42 @@ void decode_png() {
   ctx.ptr = idat_decomp;
   ctx.written = 0;
   int status = tinfl_decompress_mem_to_callback(idat, &idat_size, tinfl_put_buf_func, &ctx, TINFL_FLAG_PARSE_ZLIB_HEADER);
+  free(idat);
   if (!status) {
     printf("tinfl_decompress_mem_to_callback() failed with status %i!\n", status);
     free(palette);
     free(transparency);
-    free(idat);
     free(idat_decomp);
     return;
-  } free(idat);
+  }
 
   printf("Decompressed %d bytes successfully!\n", ctx.written);
 
+  unsigned char *data = NULL;
+  if (color_type == 3) {
+    data = malloc(sizeof *data * ctx.written * 3);
+    if (data == NULL) {
+      printf("Error encountered when allocating memory for parsed image data!\n");
+      free(palette);
+      free(transparency);
+      free(idat_decomp);
+      return;
+    }
+
+    for (unsigned int i = 0; i < ctx.written; i += 3) {
+      unsigned char palette_index = 3 * idat_decomp[i];
+      data[i] = palette[palette_index];
+      data[i + 1] = palette[palette_index + 1];
+      data[i + 2] = palette[palette_index + 2];
+    }
+  } else {
+    data = idat_decomp;
+    idat_decomp = NULL;
+  }
   free(palette);
-  free(transparency);
   free(idat_decomp);
+
+  free(transparency);
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
