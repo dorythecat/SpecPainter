@@ -153,8 +153,8 @@ void decode_png() {
   size_t idat_size = 0;
   while (1) {
     index = chunk_read(values, index, name, data, 8192, &size); 
-    printf("Chunk name and size: (%s, %d)\n", name, size);
-    if (index == (unsigned int)-1) break;
+    printf("Chunk name and size: (%s, %d)\n", name, size, index);
+    if (index == 0) break;
 
     if (name[0] == 80 && name[1] == 76 && name[2] == 84 && name[3] == 69) { // PLTE
       if (size % 3) {
@@ -195,6 +195,8 @@ void decode_png() {
         break;
       } idat = temp;
       for (unsigned int i = 0; i < size; i++) idat[idat_size - size + i] = data[i];
+    } if (name[0] == 73 && name[1] == 69 && name[2] == 78 && name[3] == 68) { // IEND
+      break; // If we don't do this, we WILL get a segmentation fault if the CRC of the IEND chunk is incorrect!
     }
 
     if (name[0] & 32 != 32) { // Critical chunk that's not a defined critical chunk
@@ -207,7 +209,7 @@ void decode_png() {
   SAFE_FREE(name);
   SAFE_FREE(values);
 
-  if (index != (unsigned int)-1) { // Error ocurred
+  if (index == (unsigned int)-1) { // Error ocurred
     printf("Fatal error found while loading chunk, aborting...\n");
     SAFE_FREE(palette);
     SAFE_FREE(transparency);
@@ -317,8 +319,7 @@ unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, u
     printf("Image does not conform to PNGv3 standard!\n");
     return -1;
   }
-
-  //if (*data_size == 0) return -1;
+ 
   for (unsigned int i = 0; i < *data_size; i++) data[i] = values[index++];
 
   unsigned long crc_val = 0;
@@ -327,6 +328,8 @@ unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, u
     printf("%s chunk has incorrect CRC signature!\n", name);
     return -1;
   }
+
+  if (*data_size == 0) return 0; // Otherwise the IEND chunk will be read twice and throw an error
 
   return index;
 }
