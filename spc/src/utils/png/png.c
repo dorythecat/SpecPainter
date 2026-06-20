@@ -31,7 +31,7 @@ void decode_png() {
     return;
   }
   unsigned int i = 0;
-  for (!feof(fp)) {
+  while (!feof(fp)) {
     if (i == limit) { // If we don't have enough space, resize the array to fit all of our data
       limit *= 2;
       unsigned char *temp = realloc(values, sizeof *values * limit);
@@ -196,6 +196,12 @@ void decode_png() {
       } idat = temp;
       for (unsigned int i = 0; i < size; i++) idat[idat_size - size + i] = data[i];
     }
+
+    if (name[0] & 32 != 32) { // Critical chunk that's not a defined critical chunk
+      // As per the PNGv3 specification, we're required to throw an error
+      printf("Found critical chunk with unrecognized name!\n");
+      break;
+    }
   }
   SAFE_FREE(data);
   SAFE_FREE(name);
@@ -278,21 +284,49 @@ void decode_png() {
   SAFE_FREE(transparency);
 }
 
+unsigned long crc_table[256];
+char crc_table_computed = 0; // Wether the CRC helper table has been computed or not
+
+void make_crc_table(void) {
+  for (int n = 0; n < 256; n++) {
+    unsigned long c = (unsigned long)n;
+    for (char k = 0; k < 8; k++) c = c & 1 ? 0xedb88320L ^ (c >> 1) : c >> 1;
+    crc_table[n] = c;
+  } crc_table_computed = 1;
+}
+
+unsigned long update_crc(unsigned long crc, unsigned char *buf, unsigned int len) {
+  unsigned long c = crc;
+  if (!crc_table_computed) make_crc_table();
+  for (unsigned int n = 0; n < len; n++) c = crc_table[(c ^ buf[n]) & 0xff] ^ (c >> 8);
+  return c;
+}
+
+unsigned long crc(unsigned char *name, unsigned char *data, unsigned int data_size) {
+  return update_crc(update_crc(0xffffffffL, name, 4), data, data_size) ^ 0xffffffffL;
+}
+
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
   *data_size = ((values[index] * 256 + values[index + 1]) * 256 + values[index + 2]) * 256 + values[index + 3];
   if (*data_size > max_size) {
     printf("Data size exceeds expected maximum for this chunk!\n");
     return -1;
   } index += 4;
-  for (unsigned int i = 0; i < 4; i++) name[i] = values[index++];
+  for (char i = 0; i < 4; i++) name[i] = values[index++];
   if (((unsigned char)name[2] & 32) == 32) {
     printf("Image does not conform to PNGv3 standard!\n");
     return -1;
   }
 
-  if (*data_size == 0) return -1;
+  //if (*data_size == 0) return -1;
   for (unsigned int i = 0; i < *data_size; i++) data[i] = values[index++];
-  index += 4; // TODO: Actually check CRC
+
+  unsigned long crc_val = 0;
+  for (char i = 0; i < 4; i++) crc_val = crc_val * 256 + values[index++];
+  if (crc_val != crc(name, data, *data_size)) {
+    printf("%s chunk has incorrect CRC signature!\n", name);
+    return -1;
+  }
 
   return index;
 }
