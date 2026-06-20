@@ -312,12 +312,12 @@ unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, u
   *data_size = ((values[index] * 256 + values[index + 1]) * 256 + values[index + 2]) * 256 + values[index + 3];
   if (*data_size > max_size) {
     printf("Data size exceeds expected maximum for this chunk!\n");
-    return -1;
+    return (unsigned int)-1;
   } index += 4;
   for (char i = 0; i < 4; i++) name[i] = values[index++];
   if (((unsigned char)name[2] & 32) == 32) {
     printf("Image does not conform to PNGv3 standard!\n");
-    return -1;
+    return (unsigned int)-1;
   }
  
   for (unsigned int i = 0; i < *data_size; i++) data[i] = values[index++];
@@ -326,10 +326,9 @@ unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, u
   for (char i = 0; i < 4; i++) crc_val = crc_val * 256 + values[index++];
   if (crc_val != crc(name, data, *data_size)) {
     printf("%s chunk has incorrect CRC signature!\n", name);
-    return -1;
+    return (unsigned int)-1;
   }
 
   if (*data_size == 0) return 0; // Otherwise the IEND chunk will be read twice and throw an error
-
   return index;
 }
