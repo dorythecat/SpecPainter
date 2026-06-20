@@ -255,7 +255,7 @@ void decode_png() {
     return;
   }
 
-  printf("Decompressed %d bytes successfully!\n", ctx.written);
+  printf("Decompressed %ld bytes successfully!\n", ctx.written);
 
   data = NULL; // Reusing an old name, technically a sin I guess? :/
   if (color_type == 3) {
@@ -304,8 +304,8 @@ unsigned long update_crc(unsigned long crc, unsigned char *buf, unsigned int len
   return c;
 }
 
-unsigned long crc(unsigned char *name, unsigned char *data, unsigned int data_size) {
-  return update_crc(update_crc(0xffffffffL, name, 4), data, data_size) ^ 0xffffffffL;
+unsigned long crc(char *name, unsigned char *data, unsigned int data_size) {
+  return update_crc(update_crc(0xffffffffL, (unsigned char *)name, 4), data, data_size) ^ 0xffffffffL;
 }
 
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
