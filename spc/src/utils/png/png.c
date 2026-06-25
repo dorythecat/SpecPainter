@@ -69,15 +69,9 @@ void decode_png() {
     SAFE_FREE(values);
     return;
   }
-  unsigned char *data = malloc(sizeof *data * 13);
-  if (data == NULL) {
-    printf("Error encountered when allocating memory for chunk data!\n");
-    SAFE_FREE(name);
-    SAFE_FREE(values);
-    return;
-  }
+  unsigned char *data = NULL;
   unsigned int size = 0;
-  unsigned int index = chunk_read(values, 8, name, data, 13, &size);
+  unsigned int index = chunk_read(values, 8, name, &data, &size);
   if (name[0] != 73 || name[1] != 72 || name[2] != 68 || name[3] != 82 || size != 13) {
     printf("Invalid first chunk!\n");
     SAFE_FREE(name);
@@ -137,14 +131,6 @@ void decode_png() {
     return;
   }
 
-  data = malloc(sizeof *data * 8192);
-  if (data == NULL) {
-    printf("Error encountered when allocating memory for chunk data!\n");
-    SAFE_FREE(name);
-    SAFE_FREE(values);
-    return;
-  }
-
   // Load all of the following chunks, ignore unknown chunk formats and handle all known cases
   unsigned char *palette = NULL; // In case we need to have a palette
   unsigned int palette_size = 0; // Size of the palette, in number of entries
@@ -152,7 +138,7 @@ void decode_png() {
   unsigned char *idat = NULL;
   size_t idat_size = 0;
   while (1) {
-    index = chunk_read(values, index, name, data, 8192, &size); 
+    index = chunk_read(values, index, name, &data, &size); 
     printf("Chunk name and size: (%s, %d)\n", name, size, index);
     if (index == 0) break;
 
@@ -205,6 +191,8 @@ void decode_png() {
       break;
     }
   }
+
+  // Free everything we can before even checking if there are any errors
   SAFE_FREE(data);
   SAFE_FREE(name);
   SAFE_FREE(values);
@@ -308,10 +296,11 @@ unsigned long crc(char *name, unsigned char *data, unsigned int data_size) {
   return update_crc(update_crc(0xffffffffL, (unsigned char *)name, 4), data, data_size) ^ 0xffffffffL;
 }
 
-unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char *data, unsigned int max_size, unsigned int *data_size) {
+unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char **data, unsigned int *data_size) {
+  unsigned int old_size = *data_size;
   *data_size = ((values[index] * 256 + values[index + 1]) * 256 + values[index + 2]) * 256 + values[index + 3];
-  if (*data_size > max_size) {
-    printf("Data size exceeds expected maximum for this chunk!\n");
+  if (*data_size > 2147483647) {
+    printf("Chunk size exceeds maximum allowed for PNGv3 chunks!\n");
     return (unsigned int)-1;
   } index += 4;
   for (char i = 0; i < 4; i++) name[i] = values[index++];
@@ -319,12 +308,20 @@ unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, u
     printf("Image does not conform to PNGv3 standard!\n");
     return (unsigned int)-1;
   }
- 
-  for (unsigned int i = 0; i < *data_size; i++) data[i] = values[index++];
+
+  if (old_size < *data_size) { // Only reallocate memory when actually needed
+    SAFE_FREE(*data);
+    *data = malloc(sizeof **data * *data_size);
+    if (*data == NULL) {
+      printf("Error encountered when allocating memory for chunk data!\n");
+      return (unsigned int)-1;
+    }
+  } // Could optimize by making it reallocate to a smaller chunk, but if we find a bigger chunk afterwards it might work against us, so not implementing it (for now)
+  for (unsigned int i = 0; i < *data_size; i++) (*data)[i] = values[index++];
 
   unsigned long crc_val = 0;
   for (char i = 0; i < 4; i++) crc_val = crc_val * 256 + values[index++];
-  if (crc_val != crc(name, data, *data_size)) {
+  if (crc_val != crc(name, *data, *data_size)) {
     printf("%s chunk has incorrect CRC signature!\n", name);
     return (unsigned int)-1;
   }
