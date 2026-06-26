@@ -1,5 +1,7 @@
 #include "png.h"
 
+#define CHUNK_ERROR ((unsigned int)-1) // Could change for UINT_MAX
+
 #define SAFE_FREE(p) free(p); p = NULL;
 #define SAFE_MOVE(from, to) to = from; from = NULL;
 
@@ -197,7 +199,7 @@ void decode_png() {
   SAFE_FREE(name);
   SAFE_FREE(values);
 
-  if (index == (unsigned int)-1) { // Error ocurred
+  if (index == CHUNK_ERROR) { // Error ocurred
     printf("Fatal error found while loading chunk, aborting...\n");
     SAFE_FREE(palette);
     SAFE_FREE(transparency);
@@ -301,12 +303,12 @@ unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, u
   *data_size = ((values[index] * 256 + values[index + 1]) * 256 + values[index + 2]) * 256 + values[index + 3];
   if (*data_size > 2147483647) {
     printf("Chunk size exceeds maximum allowed for PNGv3 chunks!\n");
-    return (unsigned int)-1;
+    return CHUNK_ERROR;
   } index += 4;
   for (char i = 0; i < 4; i++) name[i] = values[index++];
   if (((unsigned char)name[2] & 32) == 32) {
     printf("Image does not conform to PNGv3 standard!\n");
-    return (unsigned int)-1;
+    return CHUNK_ERROR;
   }
 
   if (old_size < *data_size) { // Only reallocate memory when actually needed
@@ -314,7 +316,7 @@ unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, u
     *data = malloc(sizeof **data * *data_size);
     if (*data == NULL) {
       printf("Error encountered when allocating memory for chunk data!\n");
-      return (unsigned int)-1;
+      return CHUNK_ERROR;
     }
   } // Could optimize by making it reallocate to a smaller chunk, but if we find a bigger chunk afterwards it might work against us, so not implementing it (for now)
   for (unsigned int i = 0; i < *data_size; i++) (*data)[i] = values[index++];
@@ -323,7 +325,7 @@ unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, u
   for (char i = 0; i < 4; i++) crc_val = crc_val * 256 + values[index++];
   if (crc_val != crc(name, *data, *data_size)) {
     printf("%s chunk has incorrect CRC signature!\n", name);
-    return (unsigned int)-1;
+    return CHUNK_ERROR;
   }
 
   if (*data_size == 0) return 0; // Otherwise the IEND chunk will be read twice and throw an error
