@@ -19,7 +19,7 @@ static int tinfl_put_buf_func(const void *pBuf, int len, void *pUser) {
 }
 
 // TODO: Possibly make returned ints be eror codes?
-int decode_png(char *filename, unsigned char **out, unsigned long *out_size) {
+int decode_png(char *filename, unsigned char **out, unsigned long *out_size, unsigned int *width, unsigned int *height, char *bit_depth, char *color_type) {
   FILE *fp = fopen(filename, "r");
   if (fp == NULL || ferror(fp)) { // File could not be loaded
     printf("Error encountered when opening file!\n");
@@ -57,7 +57,6 @@ int decode_png(char *filename, unsigned char **out, unsigned long *out_size) {
     return -1;
   } SAFE_MOVE(temp, values);
 
-  printf("File size: %d\n", values_size);
   if (values[0] != 137 || values[1] != 80 || values[2] != 78 || values[3] != 71 ||
       values[4] != 13  || values[5] != 10 || values[6] != 26 || values[7] != 10) {
     printf("Invalid file signature!\n");
@@ -83,24 +82,24 @@ int decode_png(char *filename, unsigned char **out, unsigned long *out_size) {
     return -1;
   } SAFE_FREE(name);
 
-  unsigned int width = ((data[0] * 256 + data[1]) * 256 + data[2]) * 256 + data[3];
-  unsigned int height = ((data[4] * 256 + data[5]) * 256 + data[6]) * 256 + data[7];
-  char bit_depth = data[8];
-  char color_type = data[9];
+  *width = ((data[0] * 256 + data[1]) * 256 + data[2]) * 256 + data[3];
+  *height = ((data[4] * 256 + data[5]) * 256 + data[6]) * 256 + data[7];
+  *bit_depth = data[8];
+  *color_type = data[9];
   char compression = data[10];
   char filter = data[11];
   char interlace = data[12];
   SAFE_FREE(data);
 
-  if (color_type != 0 && color_type != 2 && color_type != 3 && color_type != 4 && color_type != 6) {
+  if (*color_type != 0 && *color_type != 2 && *color_type != 3 && *color_type != 4 && *color_type != 6) {
     printf("Image color type is unsupported!\n");
     SAFE_FREE(values);
     return -1;
   }
 
-  if ((color_type == 0 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8 && bit_depth != 16) ||
-      ((color_type == 2 || color_type == 4 || color_type == 6) && bit_depth != 8 && bit_depth != 16) ||
-      (color_type == 3 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8)) {
+  if ((*color_type == 0 && *bit_depth != 1 && *bit_depth != 2 && *bit_depth != 4 && *bit_depth != 8 && *bit_depth != 16) ||
+      ((*color_type == 2 || *color_type == 4 || *color_type == 6) && *bit_depth != 8 && *bit_depth != 16) ||
+      (*color_type == 3 && *bit_depth != 1 && *bit_depth != 2 && *bit_depth != 4 && *bit_depth != 8)) {
     printf("Image bit depth is unsupported!\n");
     SAFE_FREE(values);
     return -1;
@@ -123,9 +122,6 @@ int decode_png(char *filename, unsigned char **out, unsigned long *out_size) {
     SAFE_FREE(values);
     return -1;
   }
-
-  printf("Image width: %d\n", width);
-  printf("Image height: %d\n", height);
 
   name = malloc(sizeof *name * 4);
   if (name == NULL) {
@@ -158,18 +154,18 @@ int decode_png(char *filename, unsigned char **out, unsigned long *out_size) {
         break;
       } for (unsigned int i = 0; i < size; i++) palette[i] = data[i];
     } else if (name[0] == 116 && name[1] == 82 && name[2] == 78 && name[3] == 83) { // tRNS
-      if (color_type == 4 || color_type == 6) {
+      if (*color_type == 4 || *color_type == 6) {
         printf("Transparency chunk present on image with transparency data!\n");
         break;
       }
 
-      if (color_type == 0 || color_type == 2) {
+      if (*color_type == 0 || *color_type == 2) {
         transparency = malloc(sizeof *transparency * (size / 2));
         if (transparency == NULL) {
           printf("Error encountered when allocating memory for transparency data!\n");
           break;
         } for (unsigned int i = 0; i < size; i += 2) transparency[i] = data[i] * 256 + data[i + 1];
-      } else {
+      } else { // *color_type == 3
         transparency = malloc(sizeof *transparency * size);
         if (transparency == NULL) {
           printf("Error encountered when allocating memory for transparency data!\n");
@@ -208,7 +204,7 @@ int decode_png(char *filename, unsigned char **out, unsigned long *out_size) {
     return -1;
   }
 
-  if (color_type == 3 && palette == NULL) {
+  if (*color_type == 3 && palette == NULL) {
     printf("Palette not found for indexed color type!\n");
     return -1;
   }
@@ -248,7 +244,7 @@ int decode_png(char *filename, unsigned char **out, unsigned long *out_size) {
 
   printf("Decompressed %ld bytes successfully!\n", ctx.written);
 
-  if (color_type == 3) {
+  if (*color_type == 3) {
     *out = malloc(sizeof **out * ctx.written * 3);
     if (*out == NULL) {
       printf("Error encountered when allocating memory for parsed image data!\n");
