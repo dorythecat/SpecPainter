@@ -8,5 +8,5 @@
 
 #include "../../lib/miniz/miniz.h"
 
-void decode_png();
+int decode_png(char *filename, unsigned char **out, unsigned long *out_size);
 unsigned int chunk_read(unsigned char *values, unsigned int index, char *name, unsigned char **data, unsigned int *data_size);

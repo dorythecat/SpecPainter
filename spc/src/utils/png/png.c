@@ -18,19 +18,20 @@ static int tinfl_put_buf_func(const void *pBuf, int len, void *pUser) {
   return 1;
 }
 
-void decode_png() {
-  FILE *fp = fopen("logo.png", "r");
+// TODO: Possibly make returned ints be eror codes?
+int decode_png(char *filename, unsigned char **out, unsigned long *out_size) {
+  FILE *fp = fopen(filename, "r");
   if (fp == NULL || ferror(fp)) { // File could not be loaded
     printf("Error encountered when opening file!\n");
     fclose(fp);
-    return;
+    return -1;
   }
   unsigned int limit = 65536; // 2^16
   unsigned char *values = malloc(sizeof *values * limit);
   if (values == NULL) {
     printf("Error encountered when allocating memory for image data!\n");
     fclose(fp);
-    return;
+    return -1;
   }
   unsigned int i = 0;
   while (!feof(fp)) {
@@ -41,7 +42,7 @@ void decode_png() {
         printf("Error encountered when growing memory for image data!\n");
         SAFE_FREE(values);
         fclose(fp);
-        return;
+        return -1;
       } values = temp;
     } values[i++] = (unsigned char)fgetc(fp);
   } fclose(fp);
@@ -53,7 +54,7 @@ void decode_png() {
   if (temp == NULL) {
     printf("Error encountered when shrinking memory for image data!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   } SAFE_MOVE(temp, values);
 
   printf("File size: %d\n", values_size);
@@ -61,7 +62,7 @@ void decode_png() {
       values[4] != 13  || values[5] != 10 || values[6] != 26 || values[7] != 10) {
     printf("Invalid file signature!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   }
 
   // Load IHDR chunk
@@ -69,7 +70,7 @@ void decode_png() {
   if (name == NULL) {
     printf("Error encountered when allocating memory for chunk name!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   }
   unsigned char *data = NULL;
   unsigned int size = 0;
@@ -79,7 +80,7 @@ void decode_png() {
     SAFE_FREE(name);
     SAFE_FREE(data);
     SAFE_FREE(values);
-    return;
+    return -1;
   } SAFE_FREE(name);
 
   unsigned int width = ((data[0] * 256 + data[1]) * 256 + data[2]) * 256 + data[3];
@@ -94,7 +95,7 @@ void decode_png() {
   if (color_type != 0 && color_type != 2 && color_type != 3 && color_type != 4 && color_type != 6) {
     printf("Image color type is unsupported!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   }
 
   if ((color_type == 0 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8 && bit_depth != 16) ||
@@ -102,25 +103,25 @@ void decode_png() {
       (color_type == 3 && bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8)) {
     printf("Image bit depth is unsupported!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   }
 
   if (compression != 0) {
     printf("Image compression method is unsupported!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   }
 
   if (filter != 0) {
     printf("Image filter method is unsupported!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   }
 
   if (interlace != 0 && interlace != 1) {
     printf("Image interlace method is unsupported!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   }
 
   printf("Image width: %d\n", width);
@@ -130,7 +131,7 @@ void decode_png() {
   if (name == NULL) {
     printf("Error encountered when allocating memory for chunk name!\n");
     SAFE_FREE(values);
-    return;
+    return -1;
   }
 
   // Load all of the following chunks, ignore unknown chunk formats and handle all known cases
@@ -204,12 +205,12 @@ void decode_png() {
     SAFE_FREE(palette);
     SAFE_FREE(transparency);
     SAFE_FREE(idat);
-    return;
+    return -1;
   }
 
   if (color_type == 3 && palette == NULL) {
     printf("Palette not found for indexed color type!\n");
-    return;
+    return -1;
   }
 
   // Decompress IDAT chunks
@@ -218,7 +219,7 @@ void decode_png() {
     SAFE_FREE(palette);
     SAFE_FREE(transparency);
     SAFE_FREE(idat);
-    return;
+    return -1;
   }
 
   printf("Using miniz.c version: %s\n", MZ_VERSION);
@@ -229,7 +230,7 @@ void decode_png() {
     SAFE_FREE(palette);
     SAFE_FREE(transparency);
     SAFE_FREE(idat);
-    return;
+    return -1;
   }
 
   DecompContext ctx;
@@ -242,21 +243,20 @@ void decode_png() {
     SAFE_FREE(palette);
     SAFE_FREE(transparency);
     SAFE_FREE(idat_decomp);
-    return;
+    return -1;
   }
 
   printf("Decompressed %ld bytes successfully!\n", ctx.written);
 
-  data = NULL; // Reusing an old name, technically a sin I guess? :/
   if (color_type == 3) {
-    data = malloc(sizeof *data * ctx.written * 3);
-    if (data == NULL) {
+    *out = malloc(sizeof **out * ctx.written * 3);
+    if (*out == NULL) {
       printf("Error encountered when allocating memory for parsed image data!\n");
       SAFE_FREE(palette);
       SAFE_FREE(transparency);
       SAFE_FREE(idat_decomp);
-      return;
-    }
+      return -1;
+    } *out_size = ctx.written * 3;
 
     for (unsigned int i = 0; i < ctx.written; i++) {
       unsigned int dindex = 3 * i;
@@ -266,14 +266,18 @@ void decode_png() {
         SAFE_FREE(palette);
         SAFE_FREE(transparency);
         SAFE_FREE(idat_decomp);
-        return;
-      } for (unsigned int j = 0; j < 3; j++) data[dindex++] = palette[pindex++];
+        return -1;
+      } for (unsigned int j = 0; j < 3; j++) (*out)[dindex++] = palette[pindex++];
     }
-  } else SAFE_MOVE(idat_decomp, data);
+  } else {
+    SAFE_MOVE(idat_decomp, *out);
+    *out_size = ctx.written;
+  }
   SAFE_FREE(palette);
   SAFE_FREE(idat_decomp);
 
   SAFE_FREE(transparency);
+  return 0;
 }
 
 unsigned long crc_table[256];
